@@ -59,7 +59,7 @@ router.post('/start', async (req, res) => {
 	}
 });
 
-// Evaluate the student’s response
+// Evaluate the student's response
 router.post('/evaluate', async (req, res) => {
 	const { answer, initialPrompt } = req.body;
 
@@ -68,7 +68,7 @@ router.post('/evaluate', async (req, res) => {
         Acting as an expert, evaluate this response based on the SOLO taxonomy:
         Question Context: ${initialPrompt}
         Student's Answer: ${answer}
-        Provide feedback and the next question.`;
+        Provide feedback and the next question separately.`;
 
 		const response = await axios.post(
 			OPENAI_API_URL,
@@ -78,7 +78,7 @@ router.post('/evaluate', async (req, res) => {
 					{ role: 'system', content: 'You are a helpful assistant.' },
 					{ role: 'user', content: evaluationPrompt },
 				],
-				max_tokens: 200,
+				max_tokens: 300, // Increased max tokens to allow longer response
 				temperature: 0.5,
 			},
 			{
@@ -93,13 +93,28 @@ router.post('/evaluate', async (req, res) => {
 			response.data.choices[0]?.message?.content ||
 			'No response from model';
 
-		// Split the feedback into next question and explanation
-		const nextQuestion =
-			output.match(/Next Question:(.*)/)?.[1]?.trim() || '';
-		const helpfulFeedback = output.replace(/Next Question:(.*)/, '').trim();
+		console.log('Output from OpenAI:', output);
+
+		// Extract feedback and next question more robustly
+		const feedbackMatch = output.match(
+			/Feedback:(.*?)(?=\nNext Question:|\n|$)/s
+		);
+		const nextQuestionMatch = output.match(/Next Question:\s*(.*)/);
+
+		const feedback = feedbackMatch
+			? feedbackMatch[1].trim()
+			: 'No feedback provided.';
+		let nextQuestion = nextQuestionMatch
+			? nextQuestionMatch[1].trim()
+			: 'No next question available.';
+
+		// If there's no next question, ensure we don't send a default question
+		if (nextQuestion === 'No next question available.') {
+			nextQuestion = ''; // This prevents showing the next question if there's no progression
+		}
 
 		res.status(200).json({
-			feedback: helpfulFeedback,
+			feedback,
 			nextQuestion,
 		});
 	} catch (error) {
