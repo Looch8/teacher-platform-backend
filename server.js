@@ -18,14 +18,11 @@ console.log(
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-// TODO:
+// NOTES:
 
-// Add credits to OpenAI usage. Credits have expires, so getting the following error when testing ENDPOINTS:
-// Error evaluating response: {
-// 	error: {
-// 	  message: 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.',
-// 	  type: 'insufficient_quota',
-// 	  param: null,
-// 	  code: 'insufficient_quota'
-// 	}
-//   }
+// // Evaluate endpoint provides this response when feeding it this JSON data: {
+//     "answer": "The capital of France is Paris.",
+//     "initialPrompt": "What is the capital of France?"
+// }
+
+// {"feedback":"Based on the SOLO taxonomy, the student's answer can be evaluated as at the \"multistructural\" level. This is because the student has provided a correct response to the question without demonstrating any deeper understanding or elaboration. \n\nFeedback: Good job on correctly identifying the capital of France as Paris. To enhance your response and move to a higher level of understanding, consider providing additional information such as why Paris is the capital, its significance, or any interesting facts about the city.","nextQuestion":"Can you explain the historical significance of Paris as the capital of France and how it has influenced the country's culture and identity?"}

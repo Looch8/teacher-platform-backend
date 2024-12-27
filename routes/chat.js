@@ -22,7 +22,7 @@ router.post('/start', async (req, res) => {
 						role: 'system',
 						content: 'Act as an expert and evaluate the response.',
 					},
-					{ role: 'user', content: evaluationPrompt },
+					{ role: 'user', content: prompt },
 				],
 
 				max_tokens: 100,
@@ -49,10 +49,12 @@ router.post('/start', async (req, res) => {
 			], // Example helper prompts
 		});
 	} catch (error) {
-		console.error(
-			'Error starting interaction:',
-			error.response?.data || error.message
-		);
+		if (error.response) {
+			console.error('API error response:', error.response.data);
+			console.error('Rate Limit Headers:', error.response.headers);
+		} else {
+			console.error('Error:', error.message);
+		}
 		res.status(500).json({ error: 'Failed to generate question.' });
 	}
 });
