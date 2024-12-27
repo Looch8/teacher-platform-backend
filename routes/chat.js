@@ -4,29 +4,41 @@ require('dotenv').config();
 
 const router = express.Router();
 
-// Hugging Face Bloom API configuration
-const HF_API_URL =
-	'https://api-inference.huggingface.co/models/bigscience/bloom';
-const HF_ACCESS_TOKEN = process.env.BLOOM_ACCESS_TOKEN;
+// OpenAI API Configuration
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-// Start interaction with Bloom
+// Start interaction with OpenAI
 router.post('/start', async (req, res) => {
 	const { prompt } = req.body;
 
 	try {
 		const response = await axios.post(
-			HF_API_URL,
-			{ inputs: prompt },
+			OPENAI_API_URL,
+			{
+				model: 'gpt-3.5-turbo', // or "gpt-4" if using GPT-4
+				messages: [
+					{
+						role: 'system',
+						content: 'Act as an expert and evaluate the response.',
+					},
+					{ role: 'user', content: evaluationPrompt },
+				],
+
+				max_tokens: 100,
+				temperature: 0.5,
+			},
 			{
 				headers: {
-					Authorization: `Bearer ${HF_ACCESS_TOKEN}`,
+					Authorization: `Bearer ${OPENAI_API_KEY}`,
 					'Content-Type': 'application/json',
 				},
 			}
 		);
 
 		const output =
-			response.data?.generated_text || 'No response from model';
+			response.data.choices[0]?.message?.content ||
+			'No response from model';
 
 		res.status(200).json({
 			question: output,
@@ -57,18 +69,27 @@ router.post('/evaluate', async (req, res) => {
         Provide feedback and the next question.`;
 
 		const response = await axios.post(
-			HF_API_URL,
-			{ inputs: evaluationPrompt },
+			OPENAI_API_URL,
+			{
+				model: 'gpt-3.5-turbo', // or "gpt-4"
+				messages: [
+					{ role: 'system', content: 'You are a helpful assistant.' },
+					{ role: 'user', content: evaluationPrompt },
+				],
+				max_tokens: 200,
+				temperature: 0.5,
+			},
 			{
 				headers: {
-					Authorization: `Bearer ${HF_ACCESS_TOKEN}`,
+					Authorization: `Bearer ${OPENAI_API_KEY}`,
 					'Content-Type': 'application/json',
 				},
 			}
 		);
 
 		const output =
-			response.data?.generated_text || 'No response from model';
+			response.data.choices[0]?.message?.content ||
+			'No response from model';
 
 		// Split the feedback into next question and explanation
 		const nextQuestion =
