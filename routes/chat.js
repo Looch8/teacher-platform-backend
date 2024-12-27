@@ -61,24 +61,26 @@ router.post('/start', async (req, res) => {
 
 // Evaluate the student's response
 router.post('/evaluate', async (req, res) => {
-	const { answer, initialPrompt } = req.body;
+	const { answer, initialPrompt, currentLevel } = req.body; // Assuming `currentLevel` is passed in
 
 	try {
+		// Logic to evaluate answer based on SOLO taxonomy
 		const evaluationPrompt = `
         Acting as an expert, evaluate this response based on the SOLO taxonomy:
         Question Context: ${initialPrompt}
         Student's Answer: ${answer}
-        Provide feedback and the next question separately.`;
+        Provide feedback and the next question separately. Consider whether the student is ready to move up in SOLO taxonomy. If the student has not demonstrated enough proficiency, ask another question at the current level.
+        `;
 
 		const response = await axios.post(
 			OPENAI_API_URL,
 			{
-				model: 'gpt-3.5-turbo', // or "gpt-4"
+				model: 'gpt-3.5-turbo',
 				messages: [
 					{ role: 'system', content: 'You are a helpful assistant.' },
 					{ role: 'user', content: evaluationPrompt },
 				],
-				max_tokens: 300, // Increased max tokens to allow longer response
+				max_tokens: 300,
 				temperature: 0.5,
 			},
 			{
@@ -104,18 +106,17 @@ router.post('/evaluate', async (req, res) => {
 		const feedback = feedbackMatch
 			? feedbackMatch[1].trim()
 			: 'No feedback provided.';
-		let nextQuestion = nextQuestionMatch
+		const nextQuestion = nextQuestionMatch
 			? nextQuestionMatch[1].trim()
 			: 'No next question available.';
 
-		// If there's no next question, ensure we don't send a default question
-		if (nextQuestion === 'No next question available.') {
-			nextQuestion = ''; // This prevents showing the next question if there's no progression
-		}
+		// If no next question is available, re-ask the same question at the current level
+		const finalQuestion =
+			nextQuestion || `Please answer again at the ${currentLevel} level.`;
 
 		res.status(200).json({
 			feedback,
-			nextQuestion,
+			nextQuestion: finalQuestion,
 		});
 	} catch (error) {
 		console.error(
