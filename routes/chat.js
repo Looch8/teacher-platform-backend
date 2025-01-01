@@ -18,8 +18,9 @@ const soloLevels = [
 ];
 
 // Start interaction with OpenAI
+// Start interaction with OpenAI
 router.post('/start', async (req, res) => {
-	const { prompt, currentLevel = 'Prestructural' } = req.body;
+	const { prompt, currentLevel = 'Unistructural' } = req.body;
 
 	try {
 		const response = await axios.post(
@@ -48,37 +49,33 @@ router.post('/start', async (req, res) => {
 			response.data.choices[0]?.message?.content ||
 			'No response from model';
 
-		res.status(200).json({
-			question: output,
-			helperPrompts: [
-				'Think critically',
-				'Provide examples',
-				'Use logical reasoning',
-			], // Example helper prompts
-		});
+		res.status(200).json({ question: output });
 	} catch (error) {
-		if (error.response) {
-			console.error('API error response:', error.response.data);
-		} else {
-			console.error('Error:', error.message);
-		}
+		console.error('Error generating question:', error.message);
 		res.status(500).json({ error: 'Failed to generate question.' });
 	}
 });
 
-// Evaluate the student's response
 router.post('/evaluate', async (req, res) => {
 	const { answer, initialPrompt, currentLevel } = req.body;
 
 	try {
 		const evaluationPrompt = `
-Acting as an expert, evaluate this response based on the SOLO taxonomy:
+Evaluate this response based on SOLO Taxonomy:
 - Question Context: ${initialPrompt}
-- Current Level: ${currentLevel}
-- Student's Answer: ${answer}
-If the answer is accurate for the current level (e.g., it correctly identifies a fact), provide feedback and indicate the student's readiness to move to the next SOLO level.
-If more context or explanation is required, guide the student to elaborate while staying within the current SOLO level.
-Provide feedback on their understanding and suggest the next question based on their answer.
+- Level: ${currentLevel}
+- Answer: ${answer}
+Determine correctness as "Correct: true" or "Correct: false" and provide detailed feedback.
+
+If the response is correct:
+1. Clearly state "Correct: true".
+2. Provide the next question labeled as "Next Question: [your question here]".
+3. Include detailed feedback as "Feedback: [your feedback here]".
+
+If the response is incorrect:
+1. Clearly state "Correct: false".
+2. Suggest rephrasing the current question as "Next Question: [rephrased question]".
+3. Include feedback as "Feedback: [your feedback here]".
 `;
 
 		const response = await axios.post(
@@ -104,46 +101,39 @@ Provide feedback on their understanding and suggest the next question based on t
 			response.data.choices[0]?.message?.content ||
 			'No response from model';
 
-		// Extract feedback and the decision to level up
-		const feedbackMatch = output.match(
-			/Feedback:(.*?)(?=\nNext Level:|\n|$)/s
-		);
+		const isCorrectMatch = output.match(/Correct:\s*(true|false)/i);
+		const feedbackMatch = output.match(/Feedback:(.*?)(?=\n|$)/s);
 		const levelUpMatch = output.match(/Next Level:\s*(.*)/);
 		const nextQuestionMatch = output.match(/Next Question:\s*(.*)/);
+
+		const isCorrect = isCorrectMatch
+			? isCorrectMatch[1].trim().toLowerCase() === 'true'
+			: false;
 
 		const feedback = feedbackMatch
 			? feedbackMatch[1].trim()
 			: 'No feedback provided.';
-		const nextLevel = levelUpMatch ? levelUpMatch[1].trim() : currentLevel; // Default to current level
+		const nextLevel = levelUpMatch ? levelUpMatch[1].trim() : currentLevel;
 		const nextQuestion = nextQuestionMatch
 			? nextQuestionMatch[1].trim()
-			: `Please try again at the ${currentLevel} level.`;
+			: 'No next question provided.';
 
-		// Ensure the next level exists in SOLO taxonomy
-		const nextLevelIndex = soloLevels.indexOf(nextLevel);
-		const validNextLevel =
-			nextLevelIndex >= 0 && nextLevelIndex < soloLevels.length
-				? nextLevel
-				: currentLevel;
-
-		// Determine if the answer is correct (based on feedback)
-		const isCorrect =
-			output.toLowerCase().includes('correct') ||
-			output.toLowerCase().includes('satisfactory') ||
-			output.toLowerCase().includes('proficient'); // Customize this to match the feedback pattern
-
-		res.status(200).json({
-			isCorrect, // Add this flag to determine answer correctness
+		// Send response
+		return res.status(200).json({
+			isCorrect,
 			feedback,
-			nextLevel: validNextLevel,
+			nextLevel,
 			nextQuestion,
 		});
 	} catch (error) {
-		console.error(
-			'Error evaluating response:',
-			error.response?.data || error.message
-		);
-		res.status(500).json({ error: 'Failed to evaluate answer.' });
+		console.error('Error evaluating response:', error.message);
+
+		// Send error response
+		if (!res.headersSent) {
+			return res
+				.status(500)
+				.json({ error: 'Failed to evaluate answer.' });
+		}
 	}
 });
 
