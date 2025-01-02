@@ -10,6 +10,11 @@ app.use(cors());
 
 app.use('/api', chatRoutes);
 
+// Root Route
+app.get('/', (req, res) => {
+	res.send('Hello, world! Backend is running.');
+});
+
 // Log the environment variable to ensure it's loaded correctly
 console.log(
 	`OpenAI API Key Loaded: ${process.env.OPENAI_API_KEY ? 'Yes' : 'No'}`
