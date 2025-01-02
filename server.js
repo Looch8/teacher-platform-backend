@@ -6,7 +6,12 @@ require('dotenv').config();
 
 const app = express();
 app.use(bodyParser.json());
-app.use(cors());
+// Allow requests from your Vercel frontend domain
+app.use(
+	cors({
+		origin: 'https://teacher-platform-gffnc2ud7-looch8s-projects.vercel.app/',
+	})
+);
 
 app.use('/api', chatRoutes);
 
