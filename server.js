@@ -9,7 +9,7 @@ app.use(bodyParser.json());
 // Allow requests from your Vercel frontend domain
 app.use(
 	cors({
-		origin: 'https://teacher-platform-gffnc2ud7-looch8s-projects.vercel.app/',
+		origin: 'https://teacher-platform-gffnc2ud7-looch8s-projects.vercel.app',
 	})
 );
 
