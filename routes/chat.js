@@ -39,8 +39,8 @@ router.post('/start', async (req, res) => {
 			},
 			{
 				headers: {
-					Authorization: `Bearer ${OPENAI_API_KEY}`,
-					'Content-Type': 'application/json',
+					Authorization: `Bearer ${OPENAI_API_KEY},
+					'Content-Type': 'application/json'`,
 				},
 			}
 		);
@@ -61,33 +61,28 @@ router.post('/evaluate', async (req, res) => {
 
 	try {
 		const evaluationPrompt = `
-Evaluate this response based on SOLO Taxonomy:
+Evaluate this response based on BLOOM Taxonomy:
 - Question Context: ${initialPrompt}
 - Level: ${currentLevel}
 - Answer: ${answer}
-Determine correctness as "Correct: true" or "Correct: false" and provide detailed feedback.
 
-If the response is correct:
-1. Clearly state "Correct: true".
-2. Provide the next question labeled as "Next Question: [your question here]".
-3. Include detailed feedback as "Feedback: [your feedback here]".
-
-If the response is incorrect:
-1. Clearly state "Correct: false".
-2. Suggest rephrasing the current question as "Next Question: [rephrased question]".
-3. Include feedback as "Feedback: [your feedback here]".
-`;
+Provide feedback in a conversational, encouraging style, avoiding rigid terms like "correct" or "incorrect." Instead, give detailed feedback explaining why the answer is good or how it can be improved. Conclude with the next question using "Next Question: [your question here]".
+        `;
 
 		const response = await axios.post(
 			OPENAI_API_URL,
 			{
 				model: 'gpt-4',
 				messages: [
-					{ role: 'system', content: 'You are a helpful assistant.' },
+					{
+						role: 'system',
+						content:
+							'You are a helpful assistant and expert educator.',
+					},
 					{ role: 'user', content: evaluationPrompt },
 				],
 				max_tokens: 300,
-				temperature: 0.5,
+				temperature: 1, // Increased for more varied responses
 			},
 			{
 				headers: {
@@ -100,40 +95,26 @@ If the response is incorrect:
 		const output =
 			response.data.choices[0]?.message?.content ||
 			'No response from model';
-
-		const isCorrectMatch = output.match(/Correct:\s*(true|false)/i);
 		const feedbackMatch = output.match(/Feedback:(.*?)(?=\n|$)/s);
-		const levelUpMatch = output.match(/Next Level:\s*(.*)/);
 		const nextQuestionMatch = output.match(/Next Question:\s*(.*)/);
-
-		const isCorrect = isCorrectMatch
-			? isCorrectMatch[1].trim().toLowerCase() === 'true'
-			: false;
 
 		const feedback = feedbackMatch
 			? feedbackMatch[1].trim()
 			: 'No feedback provided.';
-		const nextLevel = levelUpMatch ? levelUpMatch[1].trim() : currentLevel;
 		const nextQuestion = nextQuestionMatch
 			? nextQuestionMatch[1].trim()
 			: 'No next question provided.';
 
-		// Send response
+		// Send the response back to the front-end
 		return res.status(200).json({
-			isCorrect,
+			isCorrect: null, // We no longer need this in the front-end
 			feedback,
-			nextLevel,
+			nextLevel: currentLevel, // Assuming the level doesn't change for now
 			nextQuestion,
 		});
 	} catch (error) {
 		console.error('Error evaluating response:', error.message);
-
-		// Send error response
-		if (!res.headersSent) {
-			return res
-				.status(500)
-				.json({ error: 'Failed to evaluate answer.' });
-		}
+		return res.status(500).json({ error: 'Failed to evaluate answer.' });
 	}
 });
 
@@ -157,8 +138,8 @@ router.post('/rephrase', async (req, res) => {
 			},
 			{
 				headers: {
-					Authorization: `Bearer ${OPENAI_API_KEY}`,
-					'Content-Type': 'application/json',
+					Authorization: `Bearer ${OPENAI_API_KEY},
+					'Content-Type': 'application/json'`,
 				},
 			}
 		);
