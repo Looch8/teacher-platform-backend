@@ -18,7 +18,6 @@ const soloLevels = [
 ];
 
 // Start interaction with OpenAI
-// Start interaction with OpenAI
 router.post('/start', async (req, res) => {
 	const { prompt, currentLevel = 'Unistructural' } = req.body;
 
