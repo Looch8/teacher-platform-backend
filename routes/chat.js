@@ -39,8 +39,8 @@ router.post('/start', async (req, res) => {
 			},
 			{
 				headers: {
-					Authorization: `Bearer ${OPENAI_API_KEY},
-					'Content-Type': 'application/json'`,
+					Authorization: `Bearer ${OPENAI_API_KEY}`,
+					'Content-Type': 'application/json',
 				},
 			}
 		);
@@ -82,7 +82,7 @@ Provide feedback in a conversational, encouraging style, avoiding rigid terms li
 					{ role: 'user', content: evaluationPrompt },
 				],
 				max_tokens: 300,
-				temperature: 1, // Increased for more varied responses
+				temperature: 0.7, // Increased for more varied responses
 			},
 			{
 				headers: {
@@ -138,8 +138,8 @@ router.post('/rephrase', async (req, res) => {
 			},
 			{
 				headers: {
-					Authorization: `Bearer ${OPENAI_API_KEY},
-					'Content-Type': 'application/json'`,
+					Authorization: `Bearer ${OPENAI_API_KEY}`,
+					'Content-Type': 'application/json',
 				},
 			}
 		);
