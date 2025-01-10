@@ -60,12 +60,19 @@ router.post('/evaluate', async (req, res) => {
 
 	try {
 		const evaluationPrompt = `
-Evaluate this response based on BLOOM Taxonomy:
+Evaluate the following response based on Bloom's Taxonomy:
 - Question Context: ${initialPrompt}
 - Level: ${currentLevel}
 - Answer: ${answer}
 
-Provide feedback in a conversational, encouraging style, avoiding rigid terms like "correct" or "incorrect." Instead, give detailed feedback explaining why the answer is good or how it can be improved. Conclude with the next question using "Next Question: [your question here]".
+1. Provide clear feedback on the answer.
+2. If correct, indicate success and provide the next question.
+3. If incorrect, explain the mistake and provide a follow-up question.
+Use a conversational tone and avoid rigid terms like "correct" or "incorrect".
+Format response as:
+Feedback: [your feedback]
+Next Question: [next question]
+Next Level: [next level, if applicable]
         `;
 
 		const response = await axios.post(
@@ -81,7 +88,7 @@ Provide feedback in a conversational, encouraging style, avoiding rigid terms li
 					{ role: 'user', content: evaluationPrompt },
 				],
 				max_tokens: 300,
-				temperature: 0.7, // Increased for more varied responses
+				temperature: 0.7, // Adjusted for varied responses
 			},
 			{
 				headers: {
@@ -94,26 +101,32 @@ Provide feedback in a conversational, encouraging style, avoiding rigid terms li
 		const output =
 			response.data.choices[0]?.message?.content ||
 			'No response from model';
-		const feedbackMatch = output.match(/Feedback:(.*?)(?=\n|$)/s);
-		const nextQuestionMatch = output.match(/Next Question:\s*(.*)/);
+
+		// Extract feedback, next question, and next level using regex
+		const feedbackMatch = output.match(/Feedback:\s*(.*?)(?=\n|$)/s);
+		const nextQuestionMatch = output.match(
+			/Next Question:\s*(.*?)(?=\n|$)/s
+		);
+		const nextLevelMatch = output.match(/Next Level:\s*(.*?)(?=\n|$)/s);
 
 		const feedback = feedbackMatch
 			? feedbackMatch[1].trim()
-			: 'No feedback provided.';
+			: 'No feedback provide.';
 		const nextQuestion = nextQuestionMatch
 			? nextQuestionMatch[1].trim()
 			: 'No next question provided.';
+		const nextLevel = nextLevelMatch
+			? nextLevelMatch[1].trim()
+			: currentLevel;
 
-		// Send the response back to the front-end
-		return res.status(200).json({
-			isCorrect: null, // We no longer need this in the front-end
+		res.status(200).json({
 			feedback,
-			nextLevel: currentLevel, // Assuming the level doesn't change for now
 			nextQuestion,
+			nextLevel,
 		});
 	} catch (error) {
 		console.error('Error evaluating response:', error.message);
-		return res.status(500).json({ error: 'Failed to evaluate answer.' });
+		res.status(500).json({ error: 'Failed to evaluate answer.' });
 	}
 });
 
@@ -158,3 +171,5 @@ router.post('/rephrase', async (req, res) => {
 });
 
 module.exports = router;
+
+//
