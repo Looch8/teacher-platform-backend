@@ -43,5 +43,11 @@ console.log(
 	`OpenAI API Key Loaded: ${process.env.OPENAI_API_KEY ? 'Yes' : 'No'}`
 );
 
+console.log('OpenAI API URL:', process.env.OPENAI_API_URL);
+console.log(
+	'OpenAI API Key Loaded:',
+	process.env.OPENAI_API_KEY ? 'Yes' : 'No'
+);
+
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
