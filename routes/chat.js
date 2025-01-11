@@ -60,20 +60,30 @@ router.post('/evaluate', async (req, res) => {
 
 	try {
 		const evaluationPrompt = `
-Evaluate the following response based on Bloom's Taxonomy:
-- Question Context: ${initialPrompt}
-- Level: ${currentLevel}
-- Answer: ${answer}
+You are an expert educator conducting a Socratic dialogue about ${initialPrompt}.
+Current SOLO taxonomy level: ${currentLevel}
 
-1. Provide clear feedback on the answer.
-2. If correct, indicate success and provide the next question.
-3. If incorrect, explain the mistake and provide a follow-up question.
-Use a conversational tone and avoid rigid terms like "correct" or "incorrect".
-Format response as:
+Previous student answer: ${answer}
+
+Evaluate the answer and respond following these rules:
+1. Never explicitly mention Bloom's taxonomy levels
+2. If the answer shows understanding at the current level:
+   - Provide encouraging feedback
+   - Generate the next question at a slightly higher difficulty
+   - If appropriate, advance to the next level with subtle encouragement
+3. If the answer shows partial understanding:
+   - Provide constructive feedback
+   - Ask a follow-up question at the same level to clarify understanding
+4. If the answer shows significant gaps:
+   - Provide helpful feedback without using terms like "incorrect"
+   - Ask a simpler question at the same level
+5. Include elements from Item Response Theory by adjusting question difficulty based on previous responses
+6. Keep feedback concise and focused
+
+Format your response exactly as:
 Feedback: [your feedback]
-Next Question: [next question]
-Next Level: [next level, if applicable]
-        `;
+Next Question: [your next question]
+Next Level: [current level or next level if advancing]`;
 
 		const response = await axios.post(
 			OPENAI_API_URL,
@@ -87,7 +97,7 @@ Next Level: [next level, if applicable]
 					},
 					{ role: 'user', content: evaluationPrompt },
 				],
-				max_tokens: 300,
+				max_tokens: 400,
 				temperature: 0.7, // Adjusted for varied responses
 			},
 			{
@@ -111,7 +121,7 @@ Next Level: [next level, if applicable]
 
 		const feedback = feedbackMatch
 			? feedbackMatch[1].trim()
-			: 'No feedback provide.';
+			: 'No feedback provided.';
 		const nextQuestion = nextQuestionMatch
 			? nextQuestionMatch[1].trim()
 			: 'No next question provided.';
