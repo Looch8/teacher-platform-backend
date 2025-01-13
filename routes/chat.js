@@ -9,96 +9,111 @@ const OPENAI_API_URL = process.env.OPENAI_API_URL;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 // Map levels to SOLO taxonomy)
-const soloLevels = [
-	'Prestructural',
-	'Unistructural',
-	'Multistructural',
-	'Relational',
-	'Extended Abstract',
-];
+// const soloLevels = [
+// 	'Prestructural',
+// 	'Unistructural',
+// 	'Multistructural',
+// 	'Relational',
+// 	'Extended Abstract',
+// ];
 
 // Start interaction with OpenAI
 router.post('/start', async (req, res) => {
 	const { prompt, currentLevel = 'Unistructural' } = req.body;
 
-	try {
-		const response = await axios.post(
-			OPENAI_API_URL,
-			{
-				model: 'gpt-4',
-				messages: [
-					{
-						role: 'system',
-						content: `You are an expert educator. Generate a ${currentLevel} level question.`,
-					},
-					{ role: 'user', content: prompt },
-				],
-				max_tokens: 100,
-				temperature: 0.5,
-			},
-			{
-				headers: {
-					Authorization: `Bearer ${OPENAI_API_KEY}`,
-					'Content-Type': 'application/json',
+	const fetchQuestion = async (retryCount = 0) => {
+		try {
+			const response = await axios.post(
+				OPENAI_API_URL,
+				{
+					model: 'gpt-4',
+					messages: [
+						{
+							role: 'system',
+							content: `You are an expert educator. Generate a ${currentLevel} level question.`,
+						},
+						{ role: 'user', content: prompt },
+					],
+					max_tokens: 400,
+					temperature: 0.5,
 				},
+				{
+					headers: {
+						Authorization: `Bearer ${OPENAI_API_KEY}`,
+						'Content-Type': 'application/json',
+					},
+				}
+			);
+
+			const output =
+				response.data.choices[0]?.message?.content ||
+				'No response from model';
+
+			// ✅ Send the response once
+			return res.status(200).json({ question: output });
+		} catch (error) {
+			if (error.response?.status === 429 && retryCount < 3) {
+				const delay = (retryCount + 1) * 3000;
+				console.warn(
+					`429 Too Many Requests. Retrying in ${
+						delay / 1000
+					} seconds... (Attempt ${retryCount + 1})`
+				);
+
+				// 🔑 Use "return" to avoid multiple responses
+				return setTimeout(() => fetchQuestion(retryCount + 1), delay);
+			} else {
+				console.error('Error generating question:', error.message);
+				return res
+					.status(500)
+					.json({ error: 'Failed to generate question.' });
 			}
-		);
+		}
+	};
 
-		const output =
-			response.data.choices[0]?.message?.content ||
-			'No response from model';
-
-		res.status(200).json({ question: output });
-	} catch (error) {
-		console.error('Error generating question:', error.message);
-		res.status(500).json({ error: 'Failed to generate question.' });
-	}
+	await fetchQuestion(); // Ensure proper execution
 });
 
 router.post('/evaluate', async (req, res) => {
-	const { answer, initialPrompt, currentLevel } = req.body;
+	const { messages, initialPrompt, currentLevel } = req.body;
+
+	// ✅ Validate messages
+	if (!messages || !Array.isArray(messages)) {
+		return res.status(400).json({ error: 'Invalid message format.' });
+	}
 
 	try {
+		// ✅ Clear and structured evaluation prompt
 		const evaluationPrompt = `
 You are an expert educator conducting a Socratic dialogue about ${initialPrompt}.
 Current SOLO taxonomy level: ${currentLevel}
 
-Previous student answer: ${answer}
+Student's Answer: ${messages[messages.length - 1].content}
 
-Evaluate the answer and respond following these rules:
-1. Never explicitly mention Bloom's taxonomy levels
-2. If the answer shows understanding at the current level:
-   - Provide encouraging feedback
-   - Generate the next question at a slightly higher difficulty
-   - If appropriate, advance to the next level with subtle encouragement
-3. If the answer shows partial understanding:
-   - Provide constructive feedback
-   - Ask a follow-up question at the same level to clarify understanding
-4. If the answer shows significant gaps:
-   - Provide helpful feedback without using terms like "incorrect"
-   - Ask a simpler question at the same level
-5. Include elements from Item Response Theory by adjusting question difficulty based on previous responses
-6. Keep feedback concise and focused
+Please follow these rules:
+1. **Feedback:** Provide constructive feedback on the answer.
+2. **Next Question:** Ask the next appropriate question.
+3. **Next Level:** Indicate if the student should progress, stay at the same level, or go back.
 
-Format your response exactly as:
-Feedback: [your feedback]
-Next Question: [your next question]
-Next Level: [current level or next level if advancing]`;
+**Respond in this exact format:**
+
+Feedback: [Your feedback here]  
+Next Question: [Your next question here]  
+Next Level: [Current or next level here]
+		`;
+
+		const formattedMessages = [
+			{ role: 'system', content: 'You are a helpful assistant.' },
+			{ role: 'user', content: evaluationPrompt },
+		];
 
 		const response = await axios.post(
 			OPENAI_API_URL,
 			{
 				model: 'gpt-4',
-				messages: [
-					{
-						role: 'system',
-						content:
-							'You are a helpful assistant and expert educator.',
-					},
-					{ role: 'user', content: evaluationPrompt },
-				],
-				max_tokens: 400,
-				temperature: 0.7, // Adjusted for varied responses
+				messages: formattedMessages,
+				max_tokens: 500,
+				temperature: 0.7,
 			},
 			{
 				headers: {
@@ -112,19 +127,21 @@ Next Level: [current level or next level if advancing]`;
 			response.data.choices[0]?.message?.content ||
 			'No response from model';
 
-		// Extract feedback, next question, and next level using regex
-		const feedbackMatch = output.match(/Feedback:\s*(.*?)(?=\n|$)/s);
+		// ✅ Improved parsing with default fallbacks
+		const feedbackMatch = output.match(
+			/Feedback:\s*(.*?)(?=\nNext Question:|\n|$)/s
+		);
 		const nextQuestionMatch = output.match(
-			/Next Question:\s*(.*?)(?=\n|$)/s
+			/Next Question:\s*(.*?)(?=\nNext Level:|\n|$)/s
 		);
 		const nextLevelMatch = output.match(/Next Level:\s*(.*?)(?=\n|$)/s);
 
 		const feedback = feedbackMatch
 			? feedbackMatch[1].trim()
-			: 'No feedback provided.';
+			: 'I was unable to provide feedback.';
 		const nextQuestion = nextQuestionMatch
 			? nextQuestionMatch[1].trim()
-			: 'No next question provided.';
+			: 'I was unable to generate a next question.';
 		const nextLevel = nextLevelMatch
 			? nextLevelMatch[1].trim()
 			: currentLevel;
@@ -135,7 +152,18 @@ Next Level: [current level or next level if advancing]`;
 			nextLevel,
 		});
 	} catch (error) {
-		console.error('Error evaluating response:', error.message);
+		if (error.response) {
+			console.error('OpenAI Error:', error.response.data);
+		} else {
+			console.error('Error evaluating response:', error.message);
+		}
+
+		if (error.response?.status === 429) {
+			return res.status(429).json({
+				error: 'Rate limit exceeded. Please wait and try again.',
+			});
+		}
+
 		res.status(500).json({ error: 'Failed to evaluate answer.' });
 	}
 });
