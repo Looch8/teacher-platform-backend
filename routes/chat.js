@@ -77,23 +77,31 @@ router.post('/start', async (req, res) => {
 router.post('/evaluate', async (req, res) => {
 	const { messages, initialPrompt, currentLevel } = req.body;
 
-	// ✅ Validate messages
 	if (!messages || !Array.isArray(messages)) {
 		return res.status(400).json({ error: 'Invalid message format.' });
 	}
 
 	try {
-		// ✅ Clear and structured evaluation prompt
+		// 📝 Updated evaluation prompt with anti-repetition instructions
 		const evaluationPrompt = `
 You are an expert educator conducting a Socratic dialogue about ${initialPrompt}.
-Current SOLO taxonomy level: ${currentLevel}
+Current SOLO taxonomy level: ${currentLevel}.
 
-Student's Answer: ${messages[messages.length - 1].content}
+Here is the conversation so far:
+${messages
+	.map(
+		(msg) =>
+			`${msg.sender === 'student' ? 'Student' : 'Educator'}: ${
+				msg.content
+			}`
+	)
+	.join('\n')}
 
-Please follow these rules:
-1. **Feedback:** Provide constructive feedback on the answer.
-2. **Next Question:** Ask the next appropriate question.
+Guidelines:
+1. **Feedback:** Provide constructive feedback on the student's answer.
+2. **Next Question:** Ask a new, more informative question without repeating previous ones.
 3. **Next Level:** Indicate if the student should progress, stay at the same level, or go back.
+4. Avoid asking the same or similar questions. Refer to the conversation history to guide your next question.
 
 **Respond in this exact format:**
 
@@ -103,8 +111,7 @@ Next Level: [Current or next level here]
 		`;
 
 		const formattedMessages = [
-			{ role: 'system', content: 'You are a helpful assistant.' },
-			{ role: 'user', content: evaluationPrompt },
+			{ role: 'system', content: evaluationPrompt },
 		];
 
 		const response = await axios.post(
@@ -127,7 +134,6 @@ Next Level: [Current or next level here]
 			response.data.choices[0]?.message?.content ||
 			'No response from model';
 
-		// ✅ Improved parsing with default fallbacks
 		const feedbackMatch = output.match(
 			/Feedback:\s*(.*?)(?=\nNext Question:|\n|$)/s
 		);
